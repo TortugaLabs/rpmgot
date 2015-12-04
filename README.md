@@ -179,6 +179,11 @@ actual file size matches `Content-Length` from the request headers.
 If the sizes do not match or if `Content-Length` was missing from the
 headers, the file is deleted (assumed to be an incomplete download).
 
+## Additional utilities
+
+* ksgen.cgi : A simple script use to create customized kickstart
+  scripts on the basis of the contents of the `PATH_INFO` variable.
+
 ## History
 
 - 1.0:  
