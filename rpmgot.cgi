@@ -22,12 +22,14 @@
 # CONFIGURATION:
 #
 # Customize the following variables to your liking
-repos="ftp.nluug.nl"
+repos="ftp.nluug.nl li.nux.ro"
 # List of hosts that we want to proxy to
 cache="/data/v1/www/rpmgot"
 # Path to a writeable directory where to store the cached objects
 file_types="rpm"
 # File type extensions that we want to cache
+timeout=3600
+# Clean download process after this many seconds
 #
 # END OF CONFIGURATION SECTION
 ######################################################################
@@ -96,10 +98,28 @@ passthrough() {
       [ -n "$v" ] && echo "$p: $v"
     done
     echo ''
-  ) | nc "$r_host" $r_port | (
+  ) | (
+    mypid=$(sh -c 'echo $PPID')
+    (
+      exec >/dev/null </dev/null 2>&1
+      cnt=$timeout
+      while [ $cnt -gt 0 ]
+      do
+	sleep 1
+	cnt=$(expr $cnt - 1)
+	[ ! -d /proc/$mypid ] && exit
+      done
+      kill $mypid 2>/dev/null
+    ) &
+    child=$!
+    echo $child
+    exec nc "$r_host" $r_port
+  )| (
+    read mon
     read proto code msg
     echo Status: $code | unix2dos
     cat
+    kill $mon >/dev/null 2>&1
   )
   exit
 }
