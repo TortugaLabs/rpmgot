@@ -22,7 +22,7 @@
 # CONFIGURATION:
 #
 # Customize the following variables to your liking
-repos="centos:mirror.colocenter.nl/pub/centos nux/dextop:li.nux.ro/download/nux/dextop"
+repos="centos:mirror.colocenter.nl/pub/centos nux/dextop:li.nux.ro/download/nux/dextop epel:mirror.proserve.nl/fedora-epel"
 #repos="centos:mirror.1000mbps.com/centos "
 #repos="centos:ftp.tudelft.nl/centos.org"
 #repos="centos:mirror.1000mbps.com/centos"
