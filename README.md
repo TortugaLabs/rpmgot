@@ -91,11 +91,22 @@ Configuration is achieved by editing the `rpmgot.cgi` file's
 
     file_types="rpm pkg.tar.xz"
 
+### Virtual Host
+
+It is possible to create a "virtual host/paths" that can be
+mapped/redirected to an specific host.  In the "repos" variable you
+can specify:
+
+    repos="<vhost>/<vpath>:<rhost>/<rpath> host2 host3"
+
+In this case, the string <vhost> will be converted to <rhost> and any
+path starting with <vpath> will be translated to <rpath>.
+
 ## Usage
 
 Once installed, you can use the proxy by using an url as follows:
 
-    http://<proxy-server>/<cgi-bin-script>/<repo-host>/<path-to-system>
+    http://<proxy-server>/<cgi-bin-script>/<repo-host>/<path-to-file>
 
 Where:
 
@@ -186,6 +197,8 @@ headers, the file is deleted (assumed to be an incomplete download).
 
 ## History
 
+- 1.1:  
+  Added "virtual" URLs
 - 1.0:  
   Rewritten in shell script.  First public release.
 - 0.0:  

@@ -22,7 +22,12 @@
 # CONFIGURATION:
 #
 # Customize the following variables to your liking
-repos="ftp.nluug.nl li.nux.ro"
+repos="centos:mirror.colocenter.nl/pub/centos nux/dextop:li.nux.ro/download/nux/dextop"
+#repos="centos:mirror.1000mbps.com/centos "
+#repos="centos:ftp.tudelft.nl/centos.org"
+#repos="centos:mirror.1000mbps.com/centos"
+#repos="nux/dextop:li.nux.ro/download/nux/dextop li.nux.ro"
+
 # List of hosts that we want to proxy to
 cache="/data/v1/www/rpmgot"
 # Path to a writeable directory where to store the cached objects
@@ -33,14 +38,61 @@ timeout=3600
 #
 # END OF CONFIGURATION SECTION
 ######################################################################
+debug() {
+  logger "$@"
+}
+
 
 valid_host() {
-  local h
+  local hpair
   [ -z "$repos" ] && return 0
 
-  for h in $repos
+  for hpair in $repos
   do
-    [ x"$h" = x"$1" ] && return 0
+    if ! (echo "$hpair" | grep -q ':') ; then
+      # No translation...
+      [ x"$hpair" = x"$1" ] && return 0
+      continue
+    fi
+    local src="$(echo "$hpair" | cut -d: -f1)"
+    local dst="$(echo "$hpair" | cut -d: -f2-)"
+
+    if ! (echo "$src" | grep -q '/') ; then
+      # Translate only host part...
+      local srchost="$src"
+      local srcpath=""
+    else
+      # Translate host and path
+      local srchost="$(echo "$src" | cut -d/ -f1)"
+      local srcpath="$(echo "$src" | cut -d/ -f2-)"
+    fi
+
+    [ x"$srchost" != x"$1" ] && continue
+
+    if ! (echo "$dst" | grep -q '/') ; then
+      # Translate only host part...
+      local dsthost="$dst"
+      local dstpath=""
+    else
+      # Translate host and path
+      local dsthost="$(echo "$dst" | cut -d/ -f1)"
+      local dstpath="$(echo "$dst" | cut -d/ -f2-)"
+    fi
+
+    remote_host="$dsthost"
+    if [ -n "$srcpath" ] ; then
+      srcpath="$srcpath/"
+      local ln=$(expr length "$srcpath")
+    else
+      local ln=0
+    fi
+    if [ x"$(expr substr "$remote_path" 1 $ln)" = x"$srcpath" ] ; then
+      local j=$(expr $(expr length "$remote_path") - $ln)
+      ln=$(expr $ln + 1)
+      remote_path="$dstpath/$(expr substr "$remote_path" $ln $j)"
+    fi
+    #debug "XL: $remote_host $remote_path"
+    return 0
   done
   return 1
 }
@@ -176,14 +228,14 @@ ck_file() {
 
 remote_host=$(echo "$PATH_INFO" | cut -d/ -f2)
 remote_path=$(echo "$PATH_INFO" | cut -d/ -f3-)
+objpath=$remote_host/$remote_path
 
 valid_host $remote_host || \
   error 403 Forbidden "remote host not allowed" "$remote_host not in list"
 
 cacheable $remote_path || passthrough $remote_host $remote_path
 
-objpath=$remote_host/$remote_path
-objname=$(basename $remote_path)
+objname=$(basename $objpath)
 
 mkdir -p $cache/$objpath || passthrough $remote_host $remote_path
 exec 9>$cache/$objpath/lock
@@ -192,15 +244,19 @@ exec 9>$cache/$objpath/lock
 # is downloading this file, because we do not know how to mux
 # it, we just act as passthrough
 flock -n 9 || passthrough $remote_host $remote_path
-
 if [ -f $cache/$objpath/$objname ] ; then
   # This object already exists in the cache!
-  exec 9>&-
-  exec cat $cache/$objpath/$objname
+  # Make sure it is any good...
+  if ck_file $cache/$objpath/$objname ; then
+    exec 9>&-
+    exec cat $cache/$objpath/$objname
+  fi
+  # Will try to download again...
+  rm -f $cache/$objpath/$objname
 fi
 
-# Doesn't exist just yet.
-# Download while saving the file.
+# We haven't seen this before
+# Download while saving file
 ( passthrough $remote_host $remote_path ) | tee $cache/$objpath/$objname
 
 # We should at least check if we retrieved the full file...
