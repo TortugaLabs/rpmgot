@@ -22,22 +22,31 @@
 # CONFIGURATION:
 #
 # Customize the following variables to your liking
-repos="centos:mirror.colocenter.nl/pub/centos nux/dextop:li.nux.ro/download/nux/dextop epel:mirror.proserve.nl/fedora-epel"
+#
+# List of hosts that we want to proxy to
+repos="centos:ftp.nluug.nl/os/Linux/distr/CentOS"
+repos="$repos nux/dextop:li.nux.ro/download/nux/dextop"
+repos="$repos epel:ftp.nluug.nl/pub/os/Linux/distr/fedora-epel"
+repos="$repos archlinux:ftp.nluug.nl/pub/os/Linux/distr/archlinux"
+#repos="centos:ftp.nluug.nl/os/Linux/distr/CentOS nux/dextop:li.nux.ro/download/nux/dextop epel:mirror.proserve.nl/fedora-epel"
+#repos="centos:mirror.colocenter.nl/pub/centos nux/dextop:li.nux.ro/download/nux/dextop epel:mirror.proserve.nl/fedora-epel"
 #repos="centos:mirror.1000mbps.com/centos "
 #repos="centos:ftp.tudelft.nl/centos.org"
 #repos="centos:mirror.1000mbps.com/centos"
 #repos="nux/dextop:li.nux.ro/download/nux/dextop li.nux.ro"
 
-# List of hosts that we want to proxy to
-cache="/data/v1/www/rpmgot"
 # Path to a writeable directory where to store the cached objects
-file_types="rpm"
+cache="/data/v1/www/rpmgot"
 # File type extensions that we want to cache
-timeout=3600
+file_types="rpm pkg.tar.xz"
+# File type extensions that we would like to save (not cache)
+ftrace_types="db"
 # Clean download process after this many seconds
+timeout=3600
 #
 # END OF CONFIGURATION SECTION
 ######################################################################
+#set -x
 debug() {
   logger "$@"
 }
@@ -119,11 +128,12 @@ error() {
   exit
 }
 
-cacheable() {
-  local ext=
-  for ext in $file_types
+is_file_type() {
+  local ext= f="$1"
+  shift
+  for ext in "$@"
   do
-    ( echo "$1" | grep -q '\.'"$ext"'$') && return 0
+    ( echo "$f" | grep -q '\.'"$ext"'$') && return 0
   done
   return 1
 }
@@ -169,7 +179,11 @@ passthrough() {
   )| (
     read mon
     read proto code msg
-    echo Status: $code | unix2dos
+    #debug proto=$proto code=$code msg=$msg
+    [ -z "$code" ] && code="500"
+    if [ "$code" != "200" ] ; then
+      error $code "$msg" "$msg" "pass through"
+    fi
     cat
     kill $mon >/dev/null 2>&1
   )
@@ -230,10 +244,21 @@ remote_host=$(echo "$PATH_INFO" | cut -d/ -f2)
 remote_path=$(echo "$PATH_INFO" | cut -d/ -f3-)
 objpath=$remote_host/$remote_path
 
+
 valid_host $remote_host || \
   error 403 Forbidden "remote host not allowed" "$remote_host not in list"
 
-cacheable $remote_path || passthrough $remote_host $remote_path
+# debug "RPMGOT: $remote_host $remote_path"
+
+# Handle non cacheable files...
+if ! is_file_type $remote_path $file_types ; then
+  is_file_type $remote_path $ftrace_types || passthrough $remote_host $remote_path
+  objdir=$(dirname $objpath)
+  mkdir -p $cache/$objdir || passthrough $remote_host $remote_path
+  # Remember this object
+  ( passthrough $remote_host $remote_path ) | tee $cache/$objpath
+  exit 0
+fi
 
 objname=$(basename $objpath)
 
