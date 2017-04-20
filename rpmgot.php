@@ -33,9 +33,10 @@ unset($f,$g);
 //
 if (!isset($cf)) sendresp(500,'Misconfigured script',FALSE);
 $cferr = '';
+if (!isset($_SERVER['SERVER_NAME'])) $_SERVER['SERVER_NAME'] = php_uname('n');
 foreach ([
     // Base URL for the script
-    'baseurl' => "http://".$_SERVER["SERVER_NAME"].$_SERVER["SCRIPT_NAME"],
+    'baseurl' => "http://".$_SERVER["SERVER_NAME"].'/'.$_SERVER["SCRIPT_NAME"],
     // Location of the cache directory
     'cache_dir' => 'rpmgot-cache/',
     // URL for the cache directory in redirections.  When the file is fully
@@ -68,7 +69,7 @@ foreach ([
 if ($cferr != '') sendresp(500,$cferr,FALSE);
 // Fix-ups...
 foreach (['cache_dir','cache_url'] as $k) {
-  $cf[$k] = preg_replace('/\/*$/','/',$cf[$k]);
+  $cf[$k] = preg_replace('/\/+$/','',$cf[$k]).'/';
 }
 foreach (['cacheable_files','meta_files'] as $k) {
   if (is_array($cf[$k])) $cf[$k] = '/('.implode('|',$cf[$k]).')/';
@@ -332,6 +333,58 @@ function rd_header($f) {
   return $hdr;
 }
 
+function listFolderFiles($dir,$mm){
+  $list = [];
+  foreach (scandir($dir) as $ff ) {
+    if ($ff == '.' || $ff == '..') continue;
+    if (preg_match($mm,$ff) && is_file($dir.$ff.'/'.$ff)) {
+      $list[] = $dir.$ff;
+    }
+    if (is_dir($dir.$ff))
+      $list = array_merge($list,listFolderFiles($dir.$ff.'/',$mm));
+  }
+  return $list;
+}
+
+////////////////////////////////////////////////////////////////////
+
+if (PHP_SAPI == 'cli') {
+  define('CMDNAME',array_shift($argv));
+  switch(array_shift($argv)) {
+    case 'info':
+      print_r($cf);
+      print_r($_SERVER);
+      print_r($argv);
+      break;
+    case 'clean':
+      $cache_dir = realpath(dirname($_SERVER['PHP_SELF'])).'/'.$cf['cache_dir'];
+
+      // Check for archlinux repos...
+      foreach (listFolderFiles($cache_dir,'/\.db$/') as $repo) {
+	$rname = basename($repo);
+	$repo = dirname($repo).'/';
+	echo "REPO: $repo NAME: $rname\n";
+	$pkgs = [];
+	foreach (array_map('basename',glob($repo.'/*.pkg.tar.xz')) as $p) {
+	  $pkgs[$p] = $p;
+	}
+	echo "Pkgs: ".count($pkgs)."\n";
+	$fp = gzopen($repo.$rname.'/'.$rname,'r');
+	while (($ln = fgets($fp)) !== FALSE) {
+	  $ln = trim($ln);
+	  if (preg_match('/\.pkg\.tar\.xz$/',$ln)) {
+	    if (isset($pkgs[$ln])) unset($pkgs[$ln]);
+	  }
+	}
+	gzclose($fp);
+	echo "Expired Pkgs: ".count($pkgs)."\n";
+      }
+      break;
+    default:
+      die('Invalid sub-command'.PHP_EOL);
+  }
+  exit;
+}
 
 
 ////////////////////////////////////////////////////////////////////
@@ -440,8 +493,8 @@ if (preg_match($cf['cacheable_files'],$path_info)) {
       if (!is_dir($fpath)) {
 	if (!mkdir($fpath,0777,TRUE)) sendresp(500,'mkdir error: '.$fpath);
       }
-      unlink($fpath.$fname);
-      $ofp = fopen($fpath.$fn,'wb');
+      @unlink($fpath.$fname);
+      $ofp = fopen($fpath.$fname,'wb');
       if ($ofp == FALSE) sendresp(500,'fopen: '.$fpath.$fname);
       log_msg('access.log','meta');
       out_header($h);
