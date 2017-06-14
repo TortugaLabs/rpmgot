@@ -378,6 +378,7 @@ if (PHP_SAPI == 'cli') {
 	}
 	gzclose($fp);
 	echo "Expired Pkgs: ".count($pkgs)."\n";
+	print_r($pkgs);
       }
       break;
     default:
@@ -478,6 +479,15 @@ if (preg_match($cf['cacheable_files'],$path_info)) {
 	    exit;
 	  }
 	}
+	if (isset($h['Content-Length'])) {
+	  $csize = ftell($ofp);
+	  if ($csize != $h['Content-Length']) {
+	    // File size did not match!
+	    unlink($fpath.'tmp');
+	    fclose($ofp);
+	    exit;
+	  }
+	}
 	fclose($ofp);
 	rename($fpath.'tmp',$fpath.$fname);
       }
@@ -493,14 +503,33 @@ if (preg_match($cf['cacheable_files'],$path_info)) {
       if (!is_dir($fpath)) {
 	if (!mkdir($fpath,0777,TRUE)) sendresp(500,'mkdir error: '.$fpath);
       }
-      @unlink($fpath.$fname);
-      $ofp = fopen($fpath.$fname,'wb');
-      if ($ofp == FALSE) sendresp(500,'fopen: '.$fpath.$fname);
-      log_msg('access.log','meta');
-      out_header($h);
-      ff_tee($h[':fp'],$ofp);
-      //fpassthru($h[':fp']);
-      fclose($ofp);
+      $lock = fopen($fpath.'lock','c');
+      if ($lock === FALSE) sendresp(500,'Unable to get lock: '.$fpath);
+      if (!flock($lock,LOCK_EX|LOCK_NB)) {
+	// Unable to obtain lock
+	log_msg('access.log','meta-passthru');
+	out_header($h);
+	fpassthru($h[':fp']);
+      } else {
+	$ofp = fopen($fpath.'tmp','wb');
+	if ($ofp == FALSE) sendresp(500,'fopen-tmp: '.$fpath);
+	log_msg('access.log','meta');
+	out_header($h);
+	wr_header($fpath.'hdr',$h); // Not really needed...
+	ff_tee($h[':fp'],$ofp);
+	if (isset($h['Content-Length'])) {
+	  $csize = ftell($ofp);
+	  if ($csize != $h['Content-Length']) {
+	    // File size did not match!
+	    unlink($fpath.'tmp');
+	    fclose($ofp);
+	    exit;
+	  }
+	}
+	fclose($ofp);
+	unlink($fpath.$fname);
+	rename($fpath.'tmp',$fpath.$fname);
+      }
     } else {
       log_msg('access.log','meta');
       out_header($h);
