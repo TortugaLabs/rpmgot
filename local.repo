@@ -1,0 +1,98 @@
+#!/bin/sh
+(cat <<-'EOF'
+[localbase]
+name=CentOS-$releasever Base
+baseurl=%base%/centos-$releasever/$releasever-os-$basearch/
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+protect=0
+
+[localupdates]
+name=CentOS-$releasever Updates
+baseurl=%rpmgot%/centos/$releasever/updates/$basearch/
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+
+[localextras]
+name=CentOS-$releasever Extras
+baseurl=%rpmgot%/centos/$releasever/extras/$basearch/
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+
+[localplus]
+name=CentOS-$releasever Plus
+baseurl=%rpmgot%/centos/$releasever/centosplus/$basearch/
+enabled=0
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-7
+
+
+[localepel]
+name=Extra Packages for Enterprise Linux 7 - $basearch
+#mirrorlist=https://mirrors.fedoraproject.org/metalink?repo=epel-7&arch=$basearch
+baseurl=%rpmgot%/epel/$releasever/$basearch/
+failovermethod=priority
+enabled=1
+gpgcheck=1
+gpgkey=%rpmgot%/epel/RPM-GPG-KEY-EPEL-$releasever
+#gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-7
+
+[local-nux]
+name=Nux Dextop
+baseurl=%rpmgot%/nux/dextop/el$releasever/$basearch
+enabled=1
+gpgcheck=1
+gpgkey=http://li.nux.ro/download/nux/RPM-GPG-KEY-nux.ro
+
+[local-remirepo]
+name=Remi Repo
+baseurl=%rpmgot%/remirepo/$releasever/safe/$basearch
+enabled=1
+gpgcheck=1
+gpgkey=https://rpms.remirepo.net/RPM-GPG-KEY-remi
+
+[local-elrepo]
+name=ELRepo.org Community Enterprise Linux Repo
+baseurl=%rpmgot%/elrepo/elrepo/el$releasever/$basearch
+enabled=0
+gpgcheck=1
+gpgkey=https://www.elrepo.org/RPM-GPG-KEY-elrepo.org
+
+[local-elrepokernel]
+name=ELRepo.org Community Enterprise Linux Kernel rpo
+baseurl=%rpmgot%/elrepo/kernel/el$releasever/$basearch
+enabled=0
+gpgcheck=1
+gpgkey=https://www.elrepo.org/RPM-GPG-KEY-elrepo.org
+
+[local-googlechrome]
+name=local-googlechrome
+#baseurl=http://dl.google.com/linux/chrome/rpm/stable/$basearch
+baseurl=%rpmgot%/google/chrome/rpm/stable/$basearch
+enabled=1
+gpgcheck=1
+gpgkey=https://dl-ssl.google.com/linux/linux_signing_key.pub
+
+[local-googlemusicmanager]
+name=local-googlemusicmanager
+#baseurl=http://dl.google.com/linux/musicmanager/rpm/stable/x86_64
+baseurl=%rpmgot%/google/musicmanager/rpm/stable/$basearch
+enabled=1
+gpgcheck=1
+gpgkey=https://dl-ssl.google.com/linux/linux_signing_key.pub
+
+EOF
+
+) | (
+  etcfile="$1"
+  if [ -z "$output" ] ; then
+   etcfile=/etc/yum.repos.d/local.repo
+  fi
+  sed \
+	-e 's!%base%!http://ow1.localnet/v1!' \
+	-e 's!%rpmgot%!http://alvm2.localnet/rpmgot/rpmgot.php!' \
+	$etcfile
+)
