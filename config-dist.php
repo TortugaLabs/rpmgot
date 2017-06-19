@@ -15,7 +15,7 @@ $cf = [
     'epel' => 'http://ftp.nluug.nl/pub/os/Linux/distr/fedora-epel',
     'remirepo' => 'http://rpms.remirepo.net/enterprise',
     'elrepo' => 'http://elrepo.org/linux',
-
+    'google' => 'http://dl.google.com/linux',
     'archlinux' => 'http://ftp.nluug.nl/pub/os/Linux/distr/archlinux',
   ],
   //'baseurl' => "http://".$_SERVER["SERVER_NAME"].$_SERVER["SCRIPT_NAME"],
